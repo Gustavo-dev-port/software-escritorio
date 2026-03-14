@@ -3,10 +3,76 @@ import sqlite3
 import os
 from tkinter import messagebox
 
-caminho_banco = os.path.join('..', 'banco_de_dados', 'advocacia.db')
+DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
+caminho_banco = os.path.join(DIRETORIO_ATUAL, '..', '..', 'Banco_de_Dados', 'advocacia.db')
+# print(f"Caminho do Banco de Dados: {caminho_banco}") // debug para verificar o caminho do banco de dados
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
+
+# janela de cadastro de usuário
+class janelaCadastroCliente(ctk.CTkToplevel):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.title("Cadastro de Cliente")
+        self.geometry("400x450")
+        self.grab_set()  # Garante que a janela seja modal
+
+        self.label_titulo = ctk.CTkLabel(self, text="Novo Cliente", font=("Roboto", 20))
+        self.label_titulo.pack(pady=20)
+
+        #campos de cadastro
+        self.entry_nome = ctk.CTkEntry(self, placeholder_text="Nome Completo")
+        self.entry_nome.pack(pady=10)
+
+        self.entry_cpf = ctk.CTkEntry(self, placeholder_text="CPF")
+        self.entry_cpf.pack(pady=10)
+
+        self.entry_telefone = ctk.CTkEntry(self, placeholder_text="Telefone")
+        self.entry_telefone.pack(pady=10)
+
+        self.entry_email = ctk.CTkEntry(self, placeholder_text="Email")
+        self.entry_email.pack(pady=10)
+
+        #botao salvar cliente
+        self.botao_cadastrar = ctk.CTkButton(self, text="Cadastrar", command=self.cadastrar_cliente, fg_color="green", hover_color="darkgreen")
+        self.botao_cadastrar.pack(pady=30)
+
+    def cadastrar_cliente(self):
+        nome = self.entry_nome.get().strip()
+        cpf = self.entry_cpf.get().strip()
+        telefone = self.entry_telefone.get().strip()
+        email = self.entry_email.get().strip()
+
+        if not nome or not cpf:
+            messagebox.showerror("Erro", "Por favor, preencha os campos obrigatórios (Nome e CPF).")
+            return
+
+        try:
+            conexao = sqlite3.connect(caminho_banco)
+            cursor = conexao.cursor()
+
+            cursor.execute("SELECT id FROM clientes WHERE cpf = ?", (cpf,))
+            if cursor.fetchone():
+                messagebox.showerror("Erro", "CPF já cadastrado. Por favor, use um CPF diferente.")
+                return
+
+            cursor.execute("INSERT INTO clientes (nome, cpf, telefone, email) VALUES (?, ?, ?, ?)", 
+                            (nome, cpf, telefone, email))
+            conexao.commit()
+
+            messagebox.showinfo("Sucesso", "Cliente cadastrado com sucesso!")
+            self.destroy()  # Fecha a janela de cadastro após o sucesso
+        
+        except sqlite3.IntegrityError:
+            messagebox.showerror("Erro de Integridade", "CPF ou Email já cadastrado. Por favor, use um valor diferente.")
+        except sqlite3.Error as e:
+            messagebox.showerror("Erro de Banco de Dados", f"Ocorreu um erro ao cadastrar o cliente: {e}")
+        finally:
+            if 'conexao' in locals():
+                conexao.close()
+
+
 
 # Janela de Listagem de Usuários
 class janelaListagem(ctk.CTkToplevel):
@@ -185,6 +251,12 @@ class Dashboard(ctk.CTk):
             self.label_info = ctk.CTkLabel(self.frame_botoes, text="Acesso restrito. Contate o administrador para mais opções.", font=("Roboto", 14))
             self.label_info.pack(pady=50)
 
+        self.btn_novo_cliente = ctk.CTkButton(self.frame_botoes, text="Cadastrar Cliente", command=self.abrir_janela_cadastro_cliente, width=200, height=50)
+        self.btn_novo_cliente.grid(row=1, column=0, padx=20, pady=20)
+
+    def abrir_janela_cadastro_cliente(self):
+        self.janela_cad_cliente = janelaCadastroCliente(self)
+
     def abrir_janela_cadastro(self):
         self.janela_cad = janelaCadastro(self)
     
@@ -246,8 +318,3 @@ class JanelaLogin(ctk.CTk):
         finally:
             if 'conexao' in locals():
                 conexao.close()
-
-
-if __name__ == "__main__":
-    app = JanelaLogin()
-    app.mainloop()
